@@ -2,26 +2,28 @@
 makarwu
 """
 import argparse
+import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from numpy.linalg import norm
 
-chunks = []
-with open('../the-verdict.txt', 'r') as file:
-    chunk = []
-    for line in file:
-        if line.strip() == "":
-            if chunk:
-                chunks.append("\n".join(chunk))
-                chunk = []
-        else:
-            chunk.append(line.strip())
+def load_chunks(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File {file_path} does not exist")
+    
+    chunks = []
+    with open(file_path, 'r') as file:
+        chunk = []
+        for line in file:
+            if line.strip() == "":
+                if chunk:
+                    chunks.append("\n".join(chunk))
+                    chunk = []
+            else:
+                chunk.append(line.strip())
 
-chunk_dict = {i: chunk for i, chunk in enumerate(chunks)}
-
-vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(chunks)
+    return chunks
 
 def cosine_sim(vec1, vec2):
     return cosine_similarity(vec1, vec2).flatten()
@@ -35,7 +37,7 @@ def euclidean_distance(vec1, vec2):
 def manhattan_distance(vec1, vec2):
     return np.sum(np.abs(vec1 - vec2), axis=1)
 
-def retrieve_chunks(query, k=5, metric='cosine'):
+def retrieve_chunks(query, vectorizer, X, chunks, k=5, metric='cosine'):
     query_vec = vectorizer.transform([query])
 
     if metric == 'cosine':
@@ -58,9 +60,18 @@ def main():
     parser.add_argument('query', type=str, help="Youre query text.")
     parser.add_argument('--metric', type=str, required=True, choices=['cosine', 'dot', 'euclidean', 'manhattan'], 
                         help="The similarity/distance metric to use.")
+    parser.add_argument('--file', type=str, required=True, choices=['moby-dick.txt', 'peter-pan.txt', 'the-verdict.txt'], 
+                        help="The text file to analyze.")
+    
     args = parser.parse_args()
 
-    retrieved_chunks = retrieve_chunks(args.query, metric=args.metric)
+    file_path = f"../{args.file}"
+    chunks = load_chunks(file_path)
+
+    vectorizer = TfidfVectorizer()
+    X = vectorizer.fit_transform(chunks)
+    retrieved_chunks = retrieve_chunks(args.query, vectorizer, X, chunks, metric=args.metric)
+    
     for chunk, score in retrieved_chunks:
         print(f"Score: {score:.2f}\n{chunk}\n")
 
